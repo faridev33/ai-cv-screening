@@ -1,5 +1,7 @@
 # AI CV Screening
 
+**Screening CV massal:** PDF → Markdown → matriks perbandingan 3 tabel berperingkat per lowongan.
+
 Aplikasi web untuk menyaring CV pelamar secara massal: PDF diubah menjadi Markdown, identitas & kontak pelamar diekstrak otomatis, lalu **seluruh kandidat dibandingkan sekaligus** terhadap deskripsi lowongan memakai LLM dan menghasilkan **3 tabel matriks evaluasi komparatif** lengkap dengan skor kecocokan dan status seleksi.
 
 Dibuat untuk tim rekrutmen yang harus memilah puluhan sampai ratusan CV per lowongan: unggah PDF lowongan kerja → kriteria beserta bobot prioritas (1–10) diekstrak otomatis → unggah semua CV → jalankan analisa → hasil peringkat siap ditinjau, tanpa membaca tiap CV manual.
@@ -72,7 +74,7 @@ Semua panggilan AI dilakukan backend ke `https://openrouter.ai/api/v1/chat/compl
 | REST API | Django REST Framework | 3.18.0 |
 | CORS | django-cors-headers | 4.9.0 |
 | Database | SQLite (bawaan Django) | - |
-| HTTP client ke OpenRouter | requests | 2.3x |
+| HTTP client ke OpenRouter | requests | 2.34.x |
 | Konversi PDF → Markdown | PyMuPDF4LLM + PyMuPDF, fallback teks halaman | 1.28.2 |
 | Perbaikan JSON keluaran LLM | json-repair (opsional, ada fallback parser) | 0.63.3 |
 | Konfigurasi | python-dotenv (`.env`) | - |
@@ -96,7 +98,7 @@ Semua panggilan AI dilakukan backend ke `https://openrouter.ai/api/v1/chat/compl
 
 ### 1. Ambil kode proyek
 
-```powershell
+```bash
 git clone https://github.com/faridev33/ai-cv-screening.git
 cd ai-cv-screening
 ```
@@ -105,7 +107,7 @@ cd ai-cv-screening
 
 Buat virtual environment di root proyek (folder `venv/` sudah di-`.gitignore`):
 
-```powershell
+```bash
 python -m venv venv
 ```
 
@@ -114,6 +116,9 @@ Aktifkan sesuai shell yang dipakai:
 ```powershell
 .\venv\Scripts\Activate.ps1     # Windows PowerShell
 venv\Scripts\activate.bat       # Windows CMD
+```
+
+```bash
 source venv/bin/activate        # macOS / Linux
 ```
 
@@ -125,7 +130,7 @@ Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 
 Instal paket backend:
 
-```powershell
+```bash
 python -m pip install --upgrade pip
 pip install django djangorestframework django-cors-headers requests pymupdf4llm python-dotenv json-repair
 ```
@@ -134,28 +139,45 @@ pip install django djangorestframework django-cors-headers requests pymupdf4llm 
 
 Jalankan migrasi database (`db.sqlite3` tidak ikut di repository, jadi langkah ini wajib):
 
-```powershell
+```bash
 cd backend
 python manage.py migrate
 python manage.py createsuperuser   # opsional, untuk mengakses /admin/
 ```
 
+Tidak ada langkah *seeding*: database mulai kosong dan data sesi lowongan dibuat lewat UI (atau `POST /api/sessions/`).
+
 ### 3. Konfigurasi API key (`.env`)
 
-Buat berkas `backend/.env`:
+Salin berkas contoh `backend/.env.example` menjadi `backend/.env`:
+
+```powershell
+Copy-Item backend\.env.example backend\.env
+```
+
+```bash
+cp backend/.env.example backend/.env
+```
+
+Lalu isi nilainya:
 
 ```env
 MY_API_KEY=sk-or-v1-isi-kunci-openrouter-anda
 MODEL_NAME=qwen/qwen3.8-max
 ```
 
+| Variabel | Wajib | Keterangan |
+| --- | --- | --- |
+| `MY_API_KEY` | Ya, untuk semua fitur AI | Kunci OpenRouter (`sk-or-v1-...`) dari <https://openrouter.ai/keys>. Bila kosong, permintaan AI gagal dan UI meminta kunci |
+| `MODEL_NAME` | Tidak | Model default bila request tidak mengirim `model`; format `vendor/nama-model`, bawaan `qwen/qwen3.8-max` |
+
 - `python-dotenv` mencari `.env` dari folder modul lalu naik ke folder induk, sehingga `.env` di root proyek pun terbaca.
-- `.env` sudah ada di `.gitignore`: jangan pernah di-commit atau dibagikan.
+- `.env` sudah ada di `.gitignore`: jangan pernah di-commit atau dibagikan. Yang di-commit hanya `backend/.env.example` (tanpa kunci asli).
 - Kunci API juga bisa diisi lewat UI, dan nilai dari UI dipakai lebih dulu daripada `.env` (lihat [API Key & Model](#api-key--model)).
 
 ### 4. Frontend: dependensi
 
-```powershell
+```bash
 cd frontend
 npm install
 ```
@@ -379,6 +401,16 @@ Hal-hal yang perlu diketahui sebelum memakai aplikasi ini dengan data pelamar ny
 
 ## Lisensi
 
-Repository ini **belum memiliki berkas `LICENSE`**, jadi belum ada lisensi yang ditetapkan. Tambahkan lisensi (misalnya MIT atau Apache-2.0) bila proyek akan dibuka untuk publik atau menerima kontribusi pihak lain.
+Proyek ini dirilis di bawah **GNU Affero General Public License v3.0 (AGPL-3.0)**; teks lengkap ada di berkas [`LICENSE`](LICENSE).
 
-Satu hal yang perlu dipertimbangkan saat memilih lisensi: konversi PDF memakai **PyMuPDF4LLM dan PyMuPDF yang berlisensi ganda AGPL-3.0 atau lisensi komersial Artifex**, sehingga pemakaiannya di aplikasi terdistribusi wajib mengikuti salah satu dari keduanya (untuk aplikasi tertutup diperlukan lisensi komersial). Dependensi lain permisif: Django dan Django REST Framework (BSD-3-Clause), json-repair (MIT), React (MIT).
+AGPL-3.0 dipilih karena konversi PDF memakai **PyMuPDF4LLM dan PyMuPDF**, yang berlisensi ganda AGPL-3.0 atau lisensi komersial Artifex. Konsekuensinya:
+
+- Memakai, mengubah, dan mendistribusikan ulang aplikasi ini diizinkan selama versi turunan tetap AGPL-3.0 dan kode sumbernya tersedia bagi penerima.
+- Menjalankan versi turunan sebagai layanan jaringan mewajibkan penawaran kode sumber kepada pengguna layanan tersebut.
+- Untuk aplikasi tertutup, lisensi komersial Artifex untuk PyMuPDF diperlukan; tanpa lisensi itu ketentuan AGPL tetap berlaku.
+
+Dependensi lain permisif: Django dan Django REST Framework (BSD-3-Clause), json-repair (MIT), React (MIT).
+
+## Kontak
+
+Pemilik dan pemelihara: [@faridev33](https://github.com/faridev33). Laporan bug, pertanyaan, atau usulan fitur: buka [issue di repository ini](https://github.com/faridev33/ai-cv-screening/issues).
